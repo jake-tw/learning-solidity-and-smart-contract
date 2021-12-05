@@ -254,11 +254,13 @@
         }
 
         contract C is A, B {
-            function setValue(uint256 z) public override(A,B) {
-                A.setValue(z);
-                B.setValue(z + z);
-            }
+            uint256 public z;
 
+            function setValue(uint256 _z) public override(A,B) {
+                z = _z;
+                A.setValue(z + 1);
+                B.setValue(z + 2);
+            }
 
             function setX(uint256 _x) public {
                 x = _x;
@@ -401,7 +403,25 @@
         - Declare modifier of 'payable' that the function has the ability to receive Ether
 
             ```sol
-            function test() external payable {
+            function deposit() external payable {
+                ...
+            }
+            ```
+        
+        - Payable constructor and address can receive Ether
+
+            ```sol
+            address payable public owner;
+
+            constructor() payable {
+                owner = payable(msg.sender);
+            }
+            ```
+
+        - Transfer Ether from this contract to address from input
+
+            ```sol
+            function transfer(address payable _to, uint _amount) public {
                 ...
             }
             ```
@@ -466,3 +486,153 @@
                     number += 1;
                 }
                 ```
+
+#### Data types
+
+- Value types: always pass by value
+    - Boolean
+        - ture or false
+        - The logical operators
+            - !, &&, ||, ==, !=
+
+        - Short-circuit evaluation
+            - (true || ... ) -> (true)
+            - (false && ... ) -> (false)
+
+        ```sol
+        bool b;
+        ```
+
+    - Integer
+        - int -> signed integer, contains negative numbers
+        - uint -> unsigned integer, 0 ~ N
+        - (u)intX -> X bits integer
+            - X is multiples of 8 and <= 256
+            - X default value is 256
+
+        - maximum and minimum
+            - type(T).min
+            - type(T).max
+
+        - The relational operators
+            - <, <=, ==, !=, >=, >
+
+        - The bitwise operators
+            - &, |, ^, ~, <<, >>
+
+        - The arithmetic operators
+            - +, -, *, /, %, **
+
+        - The assignment operators
+            - =, +=, *= ... etc
+
+        ```sol
+        uint a;
+        int8 b;
+        uint256 c;
+
+        type(uint8).min;
+        type(uint).max;
+        ```
+
+    - Fixed-size byte arrays
+        - bytesX, X = 1 ~ 32
+            - due to padding rules, bytes1 wastes 31 bytes of space, it is better use bytes type instead
+                - bytes == bytes1 ( after 0.8.0 version )
+                - byte == bytes1 ( before 0.8.0 version )
+
+        - Can do comparisons, bit operators, shift operators
+        - Index access, 0 <= index < X
+
+        ```sol
+        bytes32 b;
+        ...
+        return b[5];
+        ```
+
+    - Literals
+        - Address literal, assigned to 'address'
+            - 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db
+
+        - Integer literal, assigned to 'int(uint)'
+            - 123, 1_234_567 = 1234567
+            - 1e10, 2.5e3
+            - 0x2e
+
+        - String literal, assigned to 'string' or 'bytes'
+            - "Hello world"
+
+        - Unicode literal, assigned to 'string'
+            - unicode"Hello ✔"
+
+        - Hexadecimal literal, assigned to 'bytes'
+            - hex"001122FF"
+
+    - Address
+        - Equals Ethereum's address, 20 bytes ( 160 bits)
+        - Payable address
+            - Address with payable can transfer and send Ether
+            - Address without payable can convert to payable address;
+
+        - Address functions
+            - .balance: Ether wei value of this address
+                - 1 Ether = 10^18 wei
+
+            - .transfer(value): transfer value wei to this address
+                - Revert tx when transfer failure
+
+            - .send(value): transfer value wei to this address
+                - Return false when transfer failure
+                - Recommended use .transfer to instead .send
+
+            ```sol
+            address payable a;
+            ...
+            a.transfer(1);
+
+            address b;
+            ...
+            payable(b).transfer(1);
+
+            return a.balance;
+            ```
+
+        - Address low-level functions
+            - call, delegatecall, staticcall
+            - TODO
+
+    - Contract type
+        - this -> this contract
+        - Can convert to address type
+            - address(this)
+
+        - If contract implement receive or payable fallback function, it can convert to address payable type
+            - payable(address(this))
+
+        - Type info
+            - type(Contract).name
+            - type(Contract).creationCode
+            - type(Contract).runtimeCode
+
+    - Fixed point numbers
+        - 1.2, 3.14159 ... etc
+        - It's different from IEEE 754 ( float, double )
+        - Not implemented yet, do not use it
+
+    - Enums
+        - enum Fruit { APPLE, ORANGE }
+        - Value convert to uint, first element equals 0
+        - The size depends on how many elements
+            - uint8 -> uint16 ->  ... -> uint256
+
+        ```sol
+        enum Fruit { APPLE, ORANGE }
+
+        function takeApple() public pure returns(Fruit) {
+            Fruit f = Fruit.APPLE;
+            return f; // return 0
+        }
+        ```
+
+- Reference types: Array, Structs, Mappings
+    - Mapping types: key-value pair, like hash table
