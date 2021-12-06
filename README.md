@@ -235,6 +235,10 @@
         ```
 
     - Extands contract
+        - Can extends multiple contract
+        - Can override virtual function or virtual modifier
+        - Can specify the function of the parent contract
+        - Use parents function or modifier without override
 
         ```sol
         contract A {
@@ -272,6 +276,15 @@
         }
         ```
 
+        ```sol
+        contract A {
+            modifier foo virtual { _; }
+        }
+
+        contract B is A {
+            modifier foo override { _; }
+        }
+        ```
 
 5. State variables
     - Without the function's variable
@@ -474,20 +487,95 @@
                 - Call specific opcodes
 
         - Customize modifier
-            - _; is required
+            - _; is required, it means executing the original function
+            - Execution order
+                1. Before _;
+                2. Original function
+                3. After _;
+
+            - Can pass args to modifier
 
                 ```sol
-                modifier onlyAdmin {
-                    require(msg.sender == admin, "Permission denied.");
-                    _;
-                }
+                contract ModifierTest {
 
-                function plus1() public onlyAdmin {
-                    number += 1;
+                    uint public number;
+                    address public admin;
+
+                    constructor() {
+                        admin = msg.sender;
+                    }
+
+                    modifier onlyAdmin {
+                        // do someting before plus function
+
+                        require(msg.sender == admin, "Permission denied.");
+                        _;
+                        
+                        // do someting after plus function
+                    }
+
+                    modifier checkNumber(uint n) {
+                        if (n < 10) {
+                            _;
+                        }
+                    }
+
+                    function plus(uint n) public onlyAdmin checkNumber(n) {
+                        number += n;
+                    }
                 }
                 ```
 
 #### Data types
+
+- Data location
+    - All reference type has an additional modifier, about where it is stored
+        - storage: Persistent on blockchain until contract selfdestruct
+        - memory: Exists during the function call
+        - calldata: Read-only and non-persistent, stored function args, only available for external functions
+
+    - Copy data from differents locations will burn lots of gas, so if possible, the external function is better than public
+    - Assignments behavior
+        - Independent copy
+            - storage -> memory
+            - calldata -> memory
+            - any data -> storage
+
+        - Reference
+            - memory -> memory
+            - storage -> local storage variable
+
+        ```sol
+        contract DataLocation {
+            uint[] public storageData;
+
+            function f(uint[] memory memoryInput) public {
+                // memory copy to storage
+                storageData = memoryInput;
+
+                // local storage ref to storage
+                uint[] storage localStorage = storageData;
+
+                if (localStorage[0] == 1) {
+                    g(localStorage);
+                } else if (localStorage[0] == 2) {
+                    h(localStorage);
+                } else {
+                    delete storageData;
+                }
+            }
+
+            // storage copy to memory
+            function g(uint[] memory x) internal pure {
+                x[0] += 1;
+            }
+
+            // local storage ref to storage
+            function h(uint[] storage x) internal {
+                x[0] += 1; 
+            }
+        }
+        ```
 
 - Value types: always pass by value
     - Boolean
@@ -637,14 +725,6 @@
         ```
 
 - Reference types: Array, Struct, Mapping
-    - Data location
-        - All reference type has an additional modifier, about where it is stored
-            - storage: Persistent on blockchain until contract selfdestruct
-            - memory: Exists during the function call
-            - calldata: Read-only and non-persistent, stored function args, only available for external functions
-
-        - Copy data from differents locations will burn lots of gas, so if possible, the external function is better than public
-
     - Mapping
         - key-value pair, like hash table
         - Only declare in storage, so it's a state variable
@@ -673,5 +753,70 @@
         mapping(uint => mapping(bool => Data[])) public data;
         mapping(uint => mapping(uint => s)) data;
         ...
-        delete map[4];
+
+        // delete map[key];
+
+        delete map[0];
         ```
+
+    - Array
+        - Dynamic array
+        
+            ```sol
+            // type[] arr;
+
+            uint[] arr;
+            ```
+
+        - Fixed size array
+            
+            ```sol
+            // type[] memory arr = new type[](size);
+            
+            uint[] memory arr = new uint[](5);
+            ```
+
+        - bytes and string is special array
+            - string cannot read index and length
+            - Convert string to bytes to get length
+
+                ```sol
+                string memory str = "test";
+
+                bytes(str).length;
+                ```
+
+        - Array functions
+            - .length: return array length
+            - only support dynamic storage array
+                - .push(): initial 0 to the end of array
+                - .push(x): add x to the end of array
+                - .pop(): remove the last element
+
+    - Struct
+        - Member can be any types, either value types or reference types, include another struct or dynamic array
+
+        ```sol
+        contract StructTest {
+
+            struct Foo {
+                string message;
+            }
+
+            mapping(uint => Foo) private mapper;
+
+            function setValue(uint key, string calldata value) public {
+                Foo storage foo = mapper[key];
+                foo.message = value;
+            }
+
+            function getMessage(uint key) external view returns(string memory) {
+                // (mapper[key]).message;
+
+                Foo storage foo = mapper[key];
+                return foo.message;
+            }
+        }
+        ```
+
+#### Reentrancy attack
