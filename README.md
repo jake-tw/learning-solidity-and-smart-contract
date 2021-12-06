@@ -605,9 +605,11 @@
         - this -> this contract
         - Can convert to address type
             - address(this)
+            - address(contractVariable)
 
         - If contract implement receive or payable fallback function, it can convert to address payable type
             - payable(address(this))
+            - payable(address(contractVariable))
 
         - Type info
             - type(Contract).name
@@ -634,5 +636,42 @@
         }
         ```
 
-- Reference types: Array, Structs, Mappings
-    - Mapping types: key-value pair, like hash table
+- Reference types: Array, Struct, Mapping
+    - Data location
+        - All reference type has an additional modifier, about where it is stored
+            - storage: Persistent on blockchain until contract selfdestruct
+            - memory: Exists during the function call
+            - calldata: Read-only and non-persistent, stored function args, only available for external functions
+
+        - Copy data from differents locations will burn lots of gas, so if possible, the external function is better than public
+
+    - Mapping
+        - key-value pair, like hash table
+        - Only declare in storage, so it's a state variable
+        - Can not be return type in a public function
+        - mapping(keyType => valueType) name;
+            - keType is built-in value types, such as bytes, string, contract type, enums
+            - valueType can be built-in value types or mapping, struct ... etc
+            - delete by key, can't delete mapping
+                - delete will set value to default (0)
+
+        - Mapping doesn't save key and length info
+            - You can declare an array to save all the keys
+
+        - Mapping use keccak256(key) to be offset to read value
+        - Ethereum defined 0 in unused space, so the initial value is always 0
+            - Mapping default value
+                - (u)int -> 0
+                - boolean -> false
+                - array -> []
+                - string -> ""
+                - enum -> index 0
+
+        ```sol
+        mapping(uint => uint) map;
+        mapping(address => bool) registeredAddresses;
+        mapping(uint => mapping(bool => Data[])) public data;
+        mapping(uint => mapping(uint => s)) data;
+        ...
+        delete map[4];
+        ```
