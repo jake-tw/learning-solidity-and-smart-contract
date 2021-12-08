@@ -66,7 +66,6 @@
 
 > When 'CompilerError: Stack too deep, try removing local variables' happened, try to use struct or memory
 
-
 #### Code example
 
 - Source code
@@ -149,7 +148,9 @@
 
 #### Dev tools
 
-- [remix.ethereum.org](https://remix.ethereum.org/)
+- Visual Studio Code
+
+- [Remix - Ethereum IDE](https://remix.ethereum.org/)
     - IDE
     - Plugin
         - SOLIDITY COMPILER
@@ -158,15 +159,57 @@
         - ETHDOC - DOCUMENTATION GENERATOR
         - ETHDOC VIEWER
 
-- [metamask.io](https://metamask.io/)
+- [MetaMask](https://metamask.io/)
     - Wallet
     - Receive Ether
     - Use in testnet or mainnet either
 
-- [etherscan.io](https://etherscan.io/)
+- [Etherscan](https://etherscan.io/)
     - Check tx status
     - Verify and publish contract source code
     - Call contract function
+
+- [DappRadar](https://dappradar.com/)
+    - The world's dapp store
+
+- [The Graph](https://thegraph.com/en/)
+    - GraphQL API
+    - The world's public information
+
+- Framework
+    - JavaScript
+        - [Hardhat](https://hardhat.org/)
+        - [Truffle Suite](https://trufflesuite.com/)
+
+    - Python
+        - [Brownie](https://github.com/eth-brownie/brownie)
+
+- Security
+    - [OpenZeppelin](https://openzeppelin.com/)
+
+- Compiler
+    - [Solc](https://github.com/ethereum/solc-js)
+
+        ```bash
+        npm install -g solc
+        solcjs -V
+        ```
+
+- Test
+    - [Ganache](https://github.com/trufflesuite/ganache)
+
+        ```bash
+        // npm install -g ethereumjs-testrpc
+        npm install -g ganache-cli
+
+        testrpc
+        ```
+
+- Other
+    - [Create Eth App](https://github.com/paulrberg/create-eth-app
+)
+    - [Scaffold-ETH](https://github.com/scaffold-eth/scaffold-eth)
+    - [ETH.Build](https://eth.build/)
 
 - Faucet
     - get testnet's Ether
@@ -486,6 +529,17 @@
                 - Call function without pure
                 - Call specific opcodes
 
+        - Constant and Immutable
+            - State variables can be declared as constant or immutable (this is not yet implemented for reference types)
+            - Compiler does not reserve a storage slot for these variables
+            - constant has to be fixed at compile-time
+            - immutable can be assigned at construction time
+
+            ```sol
+            uint256 immutable public number1;
+            uint256 constant public number2;
+            ```
+
         - Customize modifier
             - _; is required, it means executing the original function
             - Execution order
@@ -668,10 +722,12 @@
 
             - .transfer(value): transfer value wei to this address
                 - Revert tx when transfer failure
+                - Spend fixed 2300 gas
 
             - .send(value): transfer value wei to this address
                 - Return false when transfer failure
                 - Recommended use .transfer to instead .send
+                - Spend fixed 2300 gas
 
             ```sol
             address payable a;
@@ -684,10 +740,6 @@
 
             return a.balance;
             ```
-
-        - Address low-level functions
-            - call, delegatecall, staticcall
-            - TODO
 
     - Contract type
         - this -> this contract
@@ -819,4 +871,94 @@
         }
         ```
 
+#### Low-level function
+
+- call: When A contract does call on B contract, the code runs in the context of B, and store data in B's storage.
+
+- callcode: When A does callcode on B, the code runs in the context of A, which like the code of B is in A, and storing data in A's storage, not recommended.
+
+- delegatecall: This is a new opcode that was a bug fix for 'callcode', when A message call B contrat, and B contract does delegatecall on C contract, the msg.sender in the delegatecall is A ( in callcode is B )
+
+- staticcall: This is used when view functions are called, which enforces the state to stay unmodified.
+
+- sample
+    - (bool, bytes memory) = addr.call(bytes memory);
+        - input: ABI encoding's memory
+
+        - output
+            - bool: is execute success or not
+            - bytes memory: execute result
+
+        - gas and value: Can adjust gas and gas value, cost all the gas when execution failure
+
+    ```sol
+    // (bool success, bytes memory result) = addr.call{gas:2000, value: 10}(input);
+
+    (bool success, bytes memory result) = addr.call(abi.encodeWithSignature("myFunction(uint256,address)", 10, msg.sender));
+    ```
+
+- Gotchas
+    - encodeWithSignature's args should use the full names of the types, not their aliases, for example, uint should be uint256 instead of uint.
+    - Storage clashes
+        - ***Functions actually point to storage slots, not to the value names***
+
+        ```sol
+        contract Proxy {
+
+            address constant private increaseContract = 0xFd33eca8D6411f405637877c9C7002D321182937;
+            address constant private multipleContract = 0x3b014c0307Ad9dc4262F1696BC463Fd3c6dC4679;
+
+            // storage location 0
+            uint256 public proxyNumber;
+
+            function increase() public {
+                increaseContract.delegatecall(abi.encodeWithSignature("increase()"));
+            }
+
+            function multiple(uint256 n) public {
+                multipleContract.delegatecall(abi.encodeWithSignature("multiple(uint256)", n));
+            }
+        }
+
+        contract Increase {
+
+            // storage location 0
+            uint256 public increaseNumber;
+
+            function increase() public {
+                increaseNumber += 1;
+            }
+        }
+
+        contract Multiple {
+
+            // storage location 0
+            uint256 public multipleNumber;
+
+            function multiple(uint n) public {
+                multipleNumber *= n;
+            }
+        }
+        ```
+
+    - Function selector clashes
+        - delegatecall uses the function selector to find a function
+        - Function selector is a 4 byte hash of the function name and function signature that define a function, which is the first 4 bytes returned from abi.encodeWithSignature(....)
+        - ***Different code may have the same function selector***
+
+        ```sol
+        contract Foo {
+            // This contract will not compile, as both functions have the same function selector
+            function collate_propagate_storage(bytes16) external {}
+            function burn(uint256) external {}
+        }
+        ```
+
 #### Reentrancy attack
+
+// TODO
+
+#### Updatable contract
+
+- Transparent proxy pattern
+- Diamond pattern
